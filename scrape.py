@@ -88,9 +88,9 @@ def apart_request(url):
         city_state = street_soup_parent.text.replace('\xa0', ' ').replace('\n', ' ').strip()
     else:
         street, city_state = '', ''
-    address_soup = soup.find(class_='SummaryTable_header__2gj_9')
+    address_soup = soup.find(class_='SummaryTable_header__2gj_9', text=re.compile('Address'))
     if address_soup:
-        address = soup.find(class_='SummaryTable_header__2gj_9').next_sibling.text.replace('\xa0', ' ').replace('\n', ' ').strip()
+        address = address_soup.next_sibling.text.replace('\xa0', ' ').replace('\n', ' ').strip()
     else:
         address = ''
     apartment_amenities, building_amenities = [], []
@@ -181,10 +181,16 @@ def loop_apartments(data):
             if leaf['image_ids'] is not None:
                 image_id = leaf['image_ids'][0]
                 if image_name is not None:
-                    image_dict.append({
-                        'image_name': image_name + '.jpg',
-                        'image_id': image_id
-                    })
+                    if '.jpg' in image_name:
+                        image_dict.append({
+                            'image_name': image_name.replace(' ', '_').replace('/', '__'),
+                            'image_id': image_id
+                        })
+                    else:
+                        image_dict.append({
+                            'image_name': image_name.replace(' ', '_').replace('/', '__').replace('.', '') + '.jpg',
+                            'image_id': image_id
+                        })
                 else:
                     continue
         if 'pb_id' in leaf and leaf['pb_id'] is not None:
