@@ -59,7 +59,7 @@ def pin_request(min_lat, min_lng, xz_token=''):
         'cache-control': "no-cache"
     }
     payload = '{"external": true,"longTerm": true,"maxLat":%s,"maxLng":%s,"minLat":%s,' \
-              '"minLng":%s,"minPrice":0,"shortTerm": false,"sort":["newest"],"transits":{},"limit":1000}' % (str(min_lat+delta), str(min_lng+delta), str(min_lat), str(min_lng))
+              '"minLng":%s,"minPrice":0,"shortTerm": false,"sort":["newest"],"transits":{},"limit":10000}' % (str(min_lat+delta), str(min_lng+delta), str(min_lat), str(min_lng))
     res = requests.request("POST", pin_url, data=payload, headers=headers)
     if res.status_code != 200:
         xz_token = json.loads(res.text)['xz_token']
@@ -112,10 +112,13 @@ def apart_request(url):
     else:
         description = ''
     agent_soup = soup.find('div', {'class': 'AgentInfo_agent__2qvKf'})
-    agent_soup.find('div', {'class': 'row p-no-gutter AgentInfo_header__2mr09'}).decompose()
-    agent_gutter = agent_soup.find_all(class_='row p-no-gutter')
-    agent_name = agent_gutter[0].text.replace('\xa0', ' ').replace('\n', ' ').strip()
-    agent_phone = agent_gutter[1].text.replace('\xa0', ' ').replace('\n', ' ').strip()
+    if agent_soup:
+        if agent_soup.find('div', {'class': 'row p-no-gutter AgentInfo_header__2mr09'}):
+            agent_soup.find('div', {'class': 'row p-no-gutter AgentInfo_header__2mr09'}).decompose()
+        agent_gutter = agent_soup.find_all(class_='row p-no-gutter')
+        if len(agent_gutter) == 2:
+            agent_name = agent_gutter[0].text.replace('\xa0', ' ').replace('\n', ' ').strip()
+            agent_phone = agent_gutter[1].text.replace('\xa0', ' ').replace('\n', ' ').strip()
     preloaded_state = soup.find('script', text=re.compile("window.__PRELOADED_STATE__"))\
         .text.replace('window.__PRELOADED_STATE__', '').replace('=', '').replace('\xa0', ' ').replace('\n', ' ').strip()[:-1]
     preloaded = "{" + re.search('"entity":{(.*)"favoritesView":', preloaded_state).group(1)[:-1]
@@ -134,15 +137,21 @@ def apart_request(url):
             floor_plans = json.loads(preloaded)['floorplan_listings']
             for floor_plan in floor_plans:
                 if 'bedrooms' in floor_plan and str(floor_plan['bedrooms']) in count_bedroom:
-                    title =floor_plan['title'].replace('\xa0', ' ').replace('\n', ' ').strip()
+                    if 'title' in floor_plan and floor_plan['title'] is not None:
+                        title =floor_plan['title'].replace('\xa0', ' ').replace('\n', ' ').strip()
+                    else:
+                        title = ''
                     if 'square_feet' in floor_plan and floor_plan['square_feet'] is not None:
                         square_feet = str(floor_plan['square_feet']).replace('\xa0', ' ').replace('\n', ' ').strip()
                     else:
                         square_feet = ''
-                    bathroom_count = str(floor_plan['bathrooms']).replace('\xa0', ' ').replace('\n', ' ').strip()
-                    amenity_tags = floor_plan['amenity_tags']
+                    if 'bathrooms' in floor_plan and floor_plan['bathrooms'] is not None:
+                        bathroom_count = str(floor_plan['bathrooms']).replace('\xa0', ' ').replace('\n', ' ').strip()
+                    else:
+                        bathroom_count = ''
                     amenity_tags_list = []
-                    if amenity_tags:
+                    if 'amenity_tags' in floor_plan and floor_plan['amenity_tags'] is not None:
+                        amenity_tags = floor_plan['amenity_tags']
                         for ament in amenity_tags:
                             amenity_tags_list.append(ament.replace('\xa0', ' ').replace('\n', ' '))
                     min_price = str(floor_plan['min_price']).strip()
@@ -171,7 +180,13 @@ def loop_apartments(data):
             image_name = leaf['building_name']
             if leaf['image_ids'] is not None:
                 image_id = leaf['image_ids'][0]
-                image_dict.append({image_name: image_id})
+                if image_name is not None:
+                    image_dict.append({
+                        'image_name': image_name + '.jpg',
+                        'image_id': image_id
+                    })
+                else:
+                    continue
         if 'pb_id' in leaf and leaf['pb_id'] is not None:
             url = '{}b-p{}'.format(base_url, leaf['pb_id'])
         elif 'pl_id' in leaf and leaf['pl_id'] is not None:
@@ -199,7 +214,7 @@ if __name__ == '__main__':
     """
         Main Thread for scrapping apartments"""
     print('------------ Start ------------')
-    delta = 0.5  # Interval degree for latitude and longitude
+    delta = 0.1  # Interval degree for latitude and longitude
     lat_bottom = 33.75  # Latitude for start point of area you want
     lat_ceil = 33.83789  # Latitude for end point of area you want
     lng_bottom = -118.125  # Longitude for start point of area you want
@@ -213,10 +228,11 @@ if __name__ == '__main__':
         for lng in np.arange(lng_bottom, lng_ceil, delta):
             pin_response = pin_request(min_lat=lat, min_lng=lng).text
             lng_lat_json = json.loads(pin_response)
+            print(len(lng_lat_json))
             loop_apartments(lng_lat_json)
     print('======================= Start Downloading =======================')
-    for key, value in image_dict.items():
-        image_name = key.replace(' ', '_') + '.jpg'
-        image_url = 'https://img.zumpercdn.com/%s/1280x960' % value
+    for record in image_dict:
+        image_url = 'https://img.zumpercdn.com/%s/1280x960' % record['image_id']
+        image_name = record['image_name']
         download_image(url=image_url, name=image_name)
     print('------------ The End ------------')
