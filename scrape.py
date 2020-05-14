@@ -207,6 +207,8 @@ def download_image(url, name):
     :return:
     """
     print(url)
+    if not os.path.isdir(image_directory):
+        os.mkdir(image_directory)
     urllib.request.urlretrieve(url, '{}/{}'.format(image_directory, name))
 
 
@@ -228,7 +230,6 @@ if __name__ == '__main__':
         for lng in np.arange(lng_bottom, lng_ceil, delta):
             pin_response = pin_request(min_lat=lat, min_lng=lng).text
             lng_lat_json = json.loads(pin_response)
-            print(len(lng_lat_json))
             loop_apartments(lng_lat_json)
     print('======================= Start Downloading =======================')
     for record in image_dict:
