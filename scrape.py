@@ -182,15 +182,10 @@ def loop_apartments(data):
                 image_id = leaf['image_ids'][0]
                 if image_name is not None:
                     if '.jpg' in image_name:
-                        image_dict.append({
-                            'image_name': image_name.replace(' ', '_').replace('/', '__'),
-                            'image_id': image_id
-                        })
+                        image_name = image_name.replace(' ', '_').replace('/', '__')
                     else:
-                        image_dict.append({
-                            'image_name': image_name.replace(' ', '_').replace('/', '__').replace('.', '') + '.jpg',
-                            'image_id': image_id
-                        })
+                        image_name = image_name.replace(' ', '_').replace('/', '__').replace('.', '') + '.jpg'
+                    download_image(image_id=image_id, name=image_name)
                 else:
                     continue
         if 'pb_id' in leaf and leaf['pb_id'] is not None:
@@ -205,17 +200,18 @@ def loop_apartments(data):
         apart_request(url=url)
 
 
-def download_image(url, name):
+def download_image(image_id, name):
     """
     Download image from url using urllib
     :param url: image link
     :param name: name of image for downloading
     :return:
     """
-    print(url)
+    image_url = 'https://img.zumpercdn.com/%s/1280x960' % image_id
+    print(image_url)
     if not os.path.isdir(image_directory):
         os.mkdir(image_directory)
-    urllib.request.urlretrieve(url, '{}/{}'.format(image_directory, name))
+    urllib.request.urlretrieve(image_url, '{}/{}'.format(image_directory, name))
 
 
 if __name__ == '__main__':
@@ -227,7 +223,6 @@ if __name__ == '__main__':
     lat_ceil = 33.83789  # Latitude for end point of area you want
     lng_bottom = -118.125  # Longitude for start point of area you want
     lng_ceil = -117.94921  # Longitude for end point of area you want
-    image_dict = []
     image_directory = 'Image'
     file_name = 'result.csv'
     pin_url = 'https://www.padmapper.com/api/t/1/pins'
@@ -237,9 +232,4 @@ if __name__ == '__main__':
             pin_response = pin_request(min_lat=lat, min_lng=lng).text
             lng_lat_json = json.loads(pin_response)
             loop_apartments(lng_lat_json)
-    print('======================= Start Downloading =======================')
-    for record in image_dict:
-        image_url = 'https://img.zumpercdn.com/%s/1280x960' % record['image_id']
-        image_name = record['image_name']
-        download_image(url=image_url, name=image_name)
     print('------------ The End ------------')
