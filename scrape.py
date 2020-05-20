@@ -6,7 +6,8 @@ import re
 import urllib.request
 import csv
 import os
-import random, string
+import random
+import string
 csv_header = [['ADDRESS', 'CITY', 'STATE', 'LOW RANGE RENT', 'HIGH RANGE RENT', 'BEDS COUNT', 'BATHS COUNT', 'SQUARE FOOTAGE', 'PROPERTY NAME', 'UNIT DESCRIPTION', 'APARTMENT AMENITIES', 'BUILDING AMENITIES', 'AGENT NAME', 'AGENT PHONE', 'IMAGE NAME', 'REFERRAL LINK']]
 
 
@@ -175,8 +176,9 @@ def apart_request(url, image_name):
                 bedroom_price = ''
             if 'floorplan_listings' in json.loads(preloaded):
                 floor_plans = json.loads(preloaded)['floorplan_listings']
-                print(floor_plans)
                 for floor_plan in floor_plans:
+                    if 'is_messageable' in floor_plan and floor_plan['is_messageable'] is False:
+                        continue
                     if 'bedrooms' in floor_plan and str(floor_plan['bedrooms']) in count_bedroom:
                         if 'title' in floor_plan and floor_plan['title'] is not None:
                             title =floor_plan['title'].replace('\xa0', ' ').replace('\n', ' ').strip()
