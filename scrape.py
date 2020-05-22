@@ -8,6 +8,7 @@ import csv
 import os
 import random
 import string
+import time
 from datetime import datetime
 csv_header = [['ADDRESS', 'CITY', 'STATE', 'LOW RANGE RENT', 'HIGH RANGE RENT', 'BEDS COUNT', 'BATHS COUNT', 'SQUARE FOOTAGE', 'PROPERTY NAME', 'UNIT DESCRIPTION', 'APARTMENT AMENITIES', 'BUILDING AMENITIES', 'AGENT NAME', 'AGENT PHONE', 'IMAGE NAME', 'DATE', 'REFERRAL LINK']]
 
@@ -59,26 +60,43 @@ def pin_request(min_lat, min_lng, xz_token=''):
     :param xz_token: Interval for latitude and longitude
     :return: api data from pin endpoint
     """
-    headers = {
-        'Content-Type': "application/json",
-        'X-Zumper-XZ-Token': xz_token,
-        'User-Agent': "PostmanRuntime/7.15.0",
-        'Accept': "*/*",
-        'Cache-Control': "no-cache",
-        'Postman-Token': "83847dcd-d401-454a-b663-282ef18e1e72,05087467-cba5-4082-b386-8feb43a655fa",
-        'Host': "www.padmapper.com",
-        'accept-encoding': "gzip, deflate",
-        'content-length': "165",
-        'Connection': "keep-alive",
-        'cache-control': "no-cache"
-    }
-    payload = '{"external": true,"longTerm": true,"maxLat":%s,"maxLng":%s,"minLat":%s,' \
-              '"minLng":%s,"minPrice":0,"shortTerm": false,"sort":["newest"],"transits":{},"limit":10000}' % (str(min_lat+delta), str(min_lng+delta), str(min_lat), str(min_lng))
-    res = requests.request("POST", pin_url, data=payload, headers=headers)
-    if res.status_code != 200:
-        xz_token = json.loads(res.text)['xz_token']
+    try:
+        headers = {
+            'Content-Type': "application/json",
+            'X-Zumper-XZ-Token': xz_token,
+            'User-Agent': "PostmanRuntime/7.15.0",
+            'Accept': "*/*",
+            'Cache-Control': "no-cache",
+            'Postman-Token': "83847dcd-d401-454a-b663-282ef18e1e72,05087467-cba5-4082-b386-8feb43a655fa",
+            'Host': "www.padmapper.com",
+            'accept-encoding': "gzip, deflate",
+            'content-length': "165",
+            'Connection': "keep-alive",
+            'cache-control': "no-cache"
+        }
+        payload = '{"external": true,"longTerm": true,"maxLat":%s,"maxLng":%s,"minLat":%s,' \
+                  '"minLng":%s,"minPrice":0,"shortTerm": false,"sort":["newest"],"transits":{},"limit":10000}' % (str(min_lat+delta), str(min_lng+delta), str(min_lat), str(min_lng))
+        res = requests.request("POST", pin_url, data=payload, headers=headers)
+        if res.status_code != 200:
+            xz_token = json.loads(res.text)['xz_token']
+            return pin_request(min_lat=min_lat, min_lng=min_lng, xz_token=xz_token)
+        return res
+    except ConnectionError as con_err:
+        print(con_err)
+        time.sleep(10)
         return pin_request(min_lat=min_lat, min_lng=min_lng, xz_token=xz_token)
-    return res
+
+
+def send_request(url):
+    try:
+        res = requests.get(url=url)
+        if res.status_code != 200:
+            return send_request(url=url)
+        return res
+    except ConnectionError as err:
+        print(err)
+        time.sleep(10)
+        return send_request(url=url)
 
 
 def apart_request(url, image_name):
@@ -88,7 +106,7 @@ def apart_request(url, image_name):
     :return: Boolean variable if image
     """
     global date
-    apart = requests.get(url=url)
+    apart = send_request(url=url)
     soup = BeautifulSoup(apart.content, 'html5lib')
     price_soup = soup.find(class_='FullDetail_price___O0l5')
     city, state, min_price, max_price = '', '', '', ''
@@ -293,8 +311,10 @@ def download_image(image_id, name):
         if '.jpg' not in name:
             name += '.jpg'
         urllib.request.urlretrieve(image_url, '{}/{}'.format(image_directory, name))
-    except Exception as e:
-        print(e)
+    except ConnectionError as err:
+        print(err)
+        time.sleep(10)
+        return download_image(image_id=image_id, name=name)
 
 
 if __name__ == '__main__':
