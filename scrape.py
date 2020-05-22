@@ -262,7 +262,6 @@ def loop_apartments(data):
                         image_name = image_name.replace('/', '_').replace('.', '') + '.jpg'
                 else:
                     image_name = '%s.jpg' % ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))
-        print(image_name)
         if 'pb_id' in leaf and leaf['pb_id'] is not None:
             url = '{}b-p{}'.format(base_url, leaf['pb_id'])
         elif 'pl_id' in leaf and leaf['pl_id'] is not None:
@@ -291,6 +290,8 @@ def download_image(image_id, name):
     if not os.path.isdir(image_directory):
         os.mkdir(image_directory)
     try:
+        if '.jpg' not in name:
+            name += '.jpg'
         urllib.request.urlretrieve(image_url, '{}/{}'.format(image_directory, name))
     except Exception as e:
         print(e)
