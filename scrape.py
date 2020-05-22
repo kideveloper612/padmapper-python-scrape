@@ -8,7 +8,8 @@ import csv
 import os
 import random
 import string
-csv_header = [['ADDRESS', 'CITY', 'STATE', 'LOW RANGE RENT', 'HIGH RANGE RENT', 'BEDS COUNT', 'BATHS COUNT', 'SQUARE FOOTAGE', 'PROPERTY NAME', 'UNIT DESCRIPTION', 'APARTMENT AMENITIES', 'BUILDING AMENITIES', 'AGENT NAME', 'AGENT PHONE', 'IMAGE NAME', 'REFERRAL LINK']]
+from datetime import datetime
+csv_header = [['ADDRESS', 'CITY', 'STATE', 'LOW RANGE RENT', 'HIGH RANGE RENT', 'BEDS COUNT', 'BATHS COUNT', 'SQUARE FOOTAGE', 'PROPERTY NAME', 'UNIT DESCRIPTION', 'APARTMENT AMENITIES', 'BUILDING AMENITIES', 'AGENT NAME', 'AGENT PHONE', 'IMAGE NAME', 'DATE', 'REFERRAL LINK']]
 
 
 def write_direct_csv(lines, filename):
@@ -45,8 +46,8 @@ def read_progress():
     file.close()
     result = []
     for r in rows:
-        if len(r) == 16 and 'https' in r[15]:
-            result.append(r[15])
+        if len(r) > 16 and 'https' in r[16]:
+            result.append(r[16])
     return result
 
 
@@ -86,6 +87,7 @@ def apart_request(url, image_name):
     :param url: URL for scrapping one page
     :return: Boolean variable if image
     """
+    global date
     apart = requests.get(url=url)
     soup = BeautifulSoup(apart.content, 'html5lib')
     price_soup = soup.find(class_='FullDetail_price___O0l5')
@@ -179,7 +181,7 @@ def apart_request(url, image_name):
                 for floor_plan in floor_plans:
                     if 'is_messageable' in floor_plan and floor_plan['is_messageable'] is False:
                         continue
-                    if 'bedrooms' in floor_plan and str(floor_plan['bedrooms']) in count_bedroom:
+                    if 'bedrooms' in floor_plan:
                         if 'title' in floor_plan and floor_plan['title'] is not None:
                             title =floor_plan['title'].replace('\xa0', ' ').replace('\n', ' ').strip()
                         else:
@@ -194,6 +196,9 @@ def apart_request(url, image_name):
                             bathroom_count = str(floor_plan['bathrooms']).replace('\xa0', ' ').replace('\n', ' ').strip() + ' Bathrooms'
                         else:
                             bathroom_count = ''
+                        if 'half_bathrooms' in floor_plan and str(floor_plan['half_bathrooms']).strip() != '0':
+                            half_bathrooms = ', {} Half Bathrooms'.format(str(floor_plan['half_bathrooms']).strip())
+                            bathroom_count += half_bathrooms
                         amenity_tags_list = []
                         if 'amenity_tags' in floor_plan and floor_plan['amenity_tags'] is not None:
                             amenity_tags = floor_plan['amenity_tags']
@@ -209,7 +214,7 @@ def apart_request(url, image_name):
                             continue
                         min_price = '$' + min_price
                         max_price = '$' + max_price
-                        one_line = [address, city, state, min_price, max_price, count_bedroom, bathroom_count, square_feet, property_name, description, apartment_amenities, building_amenities, agent_name, agent_phone, image_name, url]
+                        one_line = [address, city, state, min_price, max_price, count_bedroom, bathroom_count, square_feet, property_name, description, apartment_amenities, building_amenities, agent_name, agent_phone, image_name, date, url]
                         if one_line not in dup_check:
                             dup_check.append(one_line)
                             print(one_line)
@@ -230,7 +235,7 @@ def apart_request(url, image_name):
             square_card_count = square_card_soup.next_sibling.text.replace('\xa0', ' ').replace('\n', ' ').replace('—', '')
         else:
             square_card_count = ''
-        one_line = [address, city, state, min_price, max_price, bedroom_card_count, bathroom_card_count, square_card_count, property_name, description, apartment_amenities, building_amenities, agent_name, agent_phone, image_name, url]
+        one_line = [address, city, state, min_price, max_price, bedroom_card_count, bathroom_card_count, square_card_count, property_name, description, apartment_amenities, building_amenities, agent_name, agent_phone, image_name, date, url]
         if one_line not in dup_check:
             dup_check.append(one_line)
             print(one_line)
@@ -246,17 +251,18 @@ def loop_apartments(data):
     base_url = 'https://www.padmapper.com/apartments/long-beach-ca/'
     for leaf in data:
         image_name = 'None'
-        if 'image_ids' in leaf and 'building_name' in leaf:
-            image_name = leaf['building_name']
+        if 'image_ids' in leaf and 'address' in leaf:
+            image_name = leaf['address']
             if leaf['image_ids'] is not None and len(leaf['image_ids']) > 0:
                 image_id = leaf['image_ids'][0]
                 if image_name is not None:
                     if '.jpg' in image_name:
-                        image_name = image_name.replace(' ', '_').replace('/', '__')
+                        image_name = image_name.replace('/', '_')
                     else:
-                        image_name = image_name.replace(' ', '_').replace('/', '__').replace('.', '') + '.jpg'
+                        image_name = image_name.replace('/', '_').replace('.', '') + '.jpg'
                 else:
                     image_name = '%s.jpg' % ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))
+        print(image_name)
         if 'pb_id' in leaf and leaf['pb_id'] is not None:
             url = '{}b-p{}'.format(base_url, leaf['pb_id'])
         elif 'pl_id' in leaf and leaf['pl_id'] is not None:
@@ -303,6 +309,7 @@ if __name__ == '__main__':
     file_name = 'result.csv'
     pin_url = 'https://www.padmapper.com/api/t/1/pins'
     progress_urls = read_progress()
+    date = datetime.today().strftime('%d/%m/%Y')
 
     for lat in np.arange(lat_bottom, lat_ceil, delta):
         for lng in np.arange(lng_bottom, lng_ceil, delta):
